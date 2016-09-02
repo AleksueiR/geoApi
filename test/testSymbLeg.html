@@ -19,6 +19,14 @@
         .symbology-container img {
             margin: 0 10px 0 0;
         }
+
+        .symbology-container svg {
+            //padding: 1px;
+            //border: 1px solid black;
+            box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.2), 0px 1px 1px 0px rgba(0, 0, 0, 0.14), 0px 2px 1px -1px rgba(0, 0, 0, 0.12);
+            margin: 0 10px 0 0;
+            //box-shadow: 0px 0px 0px 3px black;
+        }
     </style>
 </head>
 <body>
@@ -30,34 +38,60 @@
     <div id='bucket5' class="bucket"></div>
     <div id='bucket6' class="bucket"></div>
     <div id='bucket7' class="bucket"></div>
+    <div id='bucket8' class="bucket"></div>
+    <div id='megabucket' class="bucket"></div>
     <p id='mess' />
     <script src='../dist/geoapi.min.js'></script>
     <script>
-        function addImg( hostDivId, legenditem ) {
+        function addImg( hostDivId, legenditemPromise ) {
             // add a check for base64 data    myimg.src = "data:image/png;base64," + icon;
 
-            var dataurl = 'data:' + legenditem.contentType + legenditem.base + ',' + legenditem.imageData;
-            var mydiv = document.getElementById(hostDivId);
-            var myimg = new Image(32, 32);
-            myimg.border = "1px";
-            myimg.hspace = 20;
-            myimg.vspace = 20;
-            myimg.src = dataurl;
+            legenditemPromise.then(legenditem => {
+                var dataurl = 'data:' + legenditem.contentType + legenditem.base + ',' + legenditem.imageData;
+                var mydiv = document.getElementById(hostDivId);
+                var myimg = new Image(32, 32);
+                myimg.border = "1px";
+                myimg.hspace = 20;
+                myimg.vspace = 20;
+                myimg.src = dataurl;
 
-            myspan = document.createElement('span');
-            myspan.innerHTML = legenditem.label;
-            
-            var container = document.createElement('div');
-            container.setAttribute('class', 'symbology-container')
-            container.appendChild(myimg);            
-            container.appendChild(myspan);
+                myspan = document.createElement('span');
+                myspan.innerHTML = legenditem.label;
+                
+                var container = document.createElement('div');
+                container.setAttribute('class', 'symbology-container')
+                container.insertAdjacentHTML('afterbegin', legenditem.svgcode);
+                //container.appendChild(myimg);            
+                container.appendChild(myspan);
 
-            mydiv.appendChild(container);
-            // maybe add some text?
+                mydiv.appendChild(container);
+                // maybe add some text?
+            });
         }
 
         geoapi('http://js.arcgis.com/3.14/', window).then(function (api) {
             // var map = api.mapManager.Map(document.getElementById('map'), { basemap: 'topo', zoom: 6, center: [-100, 50] });
+
+            var megaLayerUrl = 'http://ec.gc.ca/arcgis/rest/services/Basemaps/OilSandsBasemap/MapServer/';
+            
+            for (var i = 44; i <= 46; i ++ ) {
+                getGuts(megaLayerUrl + i);
+            }
+
+            function getGuts(url) {
+                var layer = new api.layer.FeatureLayer(url); 
+                
+                layer.on('load', function(evt) {
+
+                    var megalegend = api.symbology.rendererToLegend(layer.renderer.toJson() , 0);
+                    console.log('megalegend', megalegend);
+
+                    megalegend.layers[0].legend.forEach(legItem => {
+                        addImg('megabucket', legItem);
+                    })
+
+                });
+            }
 
             // unique value picture markers
             var layer1 = new api.layer.FeatureLayer('http://ec.gc.ca/arcgis/rest/services/JOSM/Oilsands/MapServer/0');
@@ -133,7 +167,6 @@
             // coloured circles
             var layer7 = new api.layer.FeatureLayer('http://ec.gc.ca/arcgis/rest/services/CESI/CESI_AirEmissions_NOx/MapServer/0');
 
-
             layer7.on('load', function(evt) {
 
                 var legend7 = api.symbology.rendererToLegend(layer7.renderer.toJson() , 0);
@@ -141,6 +174,20 @@
 
                 legend7.layers[0].legend.forEach(legItem => {
                     addImg('bucket7', legItem);
+                })
+
+            });
+
+            // more coloured circles
+            var layer8 = new api.layer.FeatureLayer('http://ec.gc.ca/arcgis/rest/services/CESI/CESI_AirEmissions_NOx/MapServer/3');
+
+            layer8.on('load', function(evt) {
+
+                var legend8 = api.symbology.rendererToLegend(layer8.renderer.toJson() , 0);
+                console.log('legend8', legend8);
+
+                legend8.layers[0].legend.forEach(legItem => {
+                    addImg('bucket8', legItem);
                 })
 
             });

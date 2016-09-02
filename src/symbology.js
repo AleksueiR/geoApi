@@ -1,5 +1,6 @@
 /* jshint maxcomplexity: false */
 'use strict';
+const svgjs = require('svg.js');
 
 // Functions for turning ESRI Renderers into images
 // Specifically, converting ESRI "Simple" symbols into images,
@@ -306,7 +307,6 @@ function applyLine(lineSymbol, svg) {
         // odd case where a symbol is missing an outline, so an undefined gets passed in
         svg.addProp('stroke', 'none');
     }
-
 }
 
 /**
@@ -495,6 +495,137 @@ function makeSVG(symbol) {
 
 }
 
+function makeSVG2(symbol) {
+    const draw = svgjs(window.document.createElement('div')).size(32, 32);
+    
+    const typeHandler = {
+        esriSMS: makeMarkerSVG,
+        esriSLS: drawLine,
+        esriCLS: drawLine,
+        esriSFS: drawPolyline
+    };
+
+    const dashMap = {
+        esriSLSSolid: 'none',
+        esriSLSDash: '5.333,4',
+        esriSLSDashDot: '5.333,4,1.333,4',
+        esriSLSLongDashDotDot: '10.666,4,1.333,4,1.333,4',
+        esriSLSDot: '1.333,4',
+        esriSLSLongDash: '10.666,4',
+        esriSLSLongDashDot: '10.666,4,1.333,4',
+        esriSLSShortDash: '5.333,1.333',
+        esriSLSShortDashDot: '5.333,1.333,1.333,1.333',
+        esriSLSShortDashDotDot: '5.333,1.333,1.333,1.333,1.333,1.333',
+        esriSLSShortDot: '1.333,1.333',
+        esriSLSNull: 'none'
+    };
+
+    const esriSFSFills = {
+        //esriSFSSolid: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/solid.png',
+        esriSFSSolid: null,
+        esriSFSNone: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/none.png',
+        esriSFSHorizontal: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/horizontal.png',
+        esriSFSVertical: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/vertical.png',
+        esriSFSForwardDiagonal: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/forwarddiagonal.png',
+        esriSFSBackwardDiagonal: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/backwarddiagonal.png',
+        esriSFSCross: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/cross.png',
+        esriSFSDiagonalCross: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/diagonalcross.png'
+    };
+
+    typeHandler[symbol.type](draw, symbol);
+
+    return draw.svg();
+
+    function drawPolyline() {
+        console.log(' ---- polyline ');
+
+        const rectangle = draw.rect().move(4, 4).size(24, 24);
+        addFill(rectangle, symbol);
+        addStroke(rectangle, symbol.outline);
+
+        return;
+        /*
+        const polySVG = newSVG('rect');
+
+        polySVG.addProp('x', '4');
+        polySVG.addProp('y', '4');
+        polySVG.addProp('width', (maxW - 8).toString());
+        polySVG.addProp('height', (maxH - 8).toString());
+        applyFill(symbol, polySVG);
+        applyLine(symbol.outline, polySVG);
+
+        return polySVG;*/
+    }
+
+    function drawLine() {
+        const line = draw.line(4, 4, 28, 28);
+        addStroke(line, symbol);
+    }
+
+    function addFill(polyline, symbol) {
+        //const fill = (symbol.type === 'esriSFS' && symbol.style !== 'esriSFSSolid') ? 'none' : colourToRgb(symbol.color);
+        
+        let fill = esriSFSFills[symbol.style] || colourToRgb(symbol.color);
+
+        console.log(symbol, fill);
+
+        fill = draw.pattern(5, 5, function(add) {
+            add.line(5, 0, 0, 5).stroke({color: colourToRgb(symbol.color), opacity: 1, width: 1, linecap: 'square'});
+            add.line(5, 0, 0, 5).stroke({color: colourToRgb(symbol.color), opacity: 1, width: 1, linecap: 'square'}).move(-2.5,-2.5);
+            add.line(5, 0, 0, 5).stroke({color: colourToRgb(symbol.color), opacity: 1, width: 1, linecap: 'square'}).move(2.5,2.5);
+        });
+
+        polyline.fill({
+            color: fill,
+            opacity: colourToOpacity2(symbol.color),
+            rule: 'evenodd'
+        });
+
+        return;
+
+        // NOTE: we cannot use ESRI simple fill with styles VERTICAL, HORIZONTAL, CROSS, DIAGONAL CROSS, FORWARD DIAGONAL, BACKWARD DIAGONAL
+        // ESRI implements these using image sprites containing the pattern, referenced in SVG using xlink tags.
+        // xlink is not supported in data URLs, which is what we are using.
+        // http://dbushell.com/2015/01/30/use-svg-part-2/
+
+        // possible awful fix: we draw our SVG to a canvas, then export the image as a data url there.
+
+        // second bad option: custom case, we have pre-made filled polygon (6 of them).  We would have to add the border (yuck)
+
+        // ok solution: add a second svg <path> with the hashes in it. just be lines. thin width, black, straight.  can adjust to size
+
+        // ------
+
+        // the none case will only apply to polygons. point symbols can only be empty fill via opacity
+        /*const fill = (symbol.type === 'esriSFS' && symbol.style !== 'esriSFSSolid') ? 'none' : colourToRgb(symbol.color);
+
+        svg.addProp('fill', fill);
+        svg.addProp('fill-opacity', colourToOpacity(symbol.color));
+        svg.addProp('fill-rule', 'evenodd');*/
+    }
+
+    function addStroke(line, symbol) {
+        // odd case where a symbol is missing an outline, so an undefined gets passed in
+        line.stroke({
+            color: colourToRgb(symbol.color),
+            opacity: colourToOpacity2(symbol.color), 
+            width: symbol.width,
+            linecap: 'butt', 
+            linejoin: 'miter', 
+            miterlimit: 4, 
+            dasharray: dashMap[symbol.style] 
+        });
+    }
+
+    function colourToOpacity2(c) {
+        if (c) {
+            return c[3] / 255;
+        } else {
+            return 0;
+        }
+    }
+}
+
 /**
 * Generate a legend item for an ESRI symbol.
 * @private
@@ -504,6 +635,87 @@ function makeSVG(symbol) {
 * @return {Object} a legend object populated with the symbol and label
 */
 function symbolToLegend(symbol, label, window) {
+    //console.log(svgjs);
+    
+    const draw = svgjs(window.document.createElement('dvi')).size(32, 32);
+    //console.log(draw);
+
+    const symbologyPromise = new Promise((resolve) => {
+
+        let imageData = emptySVG;
+        let contentType = 'image/svg+xml';
+        let base = '';
+
+        try {
+            switch (symbol.type) {
+                case 'esriSMS': // simplemarkersymbol
+                case 'esriSLS': // simplelinesymbol
+                case 'esriSFS': // simplefillsymbol
+                case 'esriCLS': // cartographiclinesymbol
+
+                    // IE11 will not render a plain SVG string. we need to encode it
+                    imageData = window.btoa(makeSVG(symbol));
+                    base = ';base64';
+                    
+                    const svgcode = makeSVG2(symbol);
+                    console.log(svgcode);
+
+                    resolve({ label, svgcode, imageData, contentType, base });
+                    break;
+
+                case 'esriPMS': // picturemarkersymbol
+                case 'esriPFS': // picturefillsymbol
+
+                    // FIXME may be possible that there is no imageData, and it is a linked url that we can't support
+                    // FIXME additional for picturefill, we would want to account for the border.
+                    //       basically the same issue as the non-solid simplefillsymbol, in that
+                    //       svg data urls cannot x-link to other images
+
+                    imageData = symbol.imageData;
+                    contentType = symbol.contentType;
+                    base = ';base64';
+                    
+                    const data = `data:${symbol.contentType};base64,${symbol.imageData}`;
+                    
+                    var image = draw.image(data).loaded(loader => {
+                        // console.log('- image loaded', loader);
+
+                        if (loader.width > 28) {
+                            // console.log('resizing');
+                            image.size(28, 28);
+                        } else {
+                            // console.log('good enough');
+                            image.size(loader.width, loader.height);
+                        }
+
+                        image.center(16, 16);
+
+                        const svgcode = draw.svg();
+
+                        // console.log(svgcode);
+
+                        resolve({ label, svgcode, contentType, base });
+                    });
+                    
+                    break;
+
+                case 'esriTS': // textsymbol
+
+                    // not supporting at the moment
+                    // FIXME return a blank or default image (maybe a picture of 'Aa') to stop things from breaking
+                    throw new Error('no support for feature service legend of text symbols');
+            }
+        } catch (e) {
+            console.error('Issue encountered when converting symbol to legend image', e);
+            label = 'Error!';
+        }
+
+        // resolve({ label, imageData, contentType, base });   
+    });
+
+    return symbologyPromise;
+
+    /*
     let imageData = emptySVG;
     let contentType = 'image/svg+xml';
     let base = '';
@@ -543,7 +755,7 @@ function symbolToLegend(symbol, label, window) {
         console.error('Issue encountered when converting symbol to legend image', e);
         label = 'Error!';
     }
-    return { label, imageData, contentType, base };
+    return { label, imageData, contentType, base };*/
 }
 
 /**
