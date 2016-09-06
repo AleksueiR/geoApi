@@ -41,19 +41,20 @@
     <div id='bucket8' class="bucket"></div>
     <div id='megabucket' class="bucket"></div>
     <p id='mess' />
-    <script src='../dist/geoapi.min.js'></script>
+    <script src='../dist/geoapi.js'></script>
     <script>
         function addImg( hostDivId, legenditemPromise ) {
             // add a check for base64 data    myimg.src = "data:image/png;base64," + icon;
 
             legenditemPromise.then(legenditem => {
-                var dataurl = 'data:' + legenditem.contentType + legenditem.base + ',' + legenditem.imageData;
                 var mydiv = document.getElementById(hostDivId);
+                
+                /*var dataurl = 'data:' + legenditem.contentType + legenditem.base + ',' + legenditem.imageData;
                 var myimg = new Image(32, 32);
                 myimg.border = "1px";
                 myimg.hspace = 20;
                 myimg.vspace = 20;
-                myimg.src = dataurl;
+                myimg.src = dataurl;*/
 
                 myspan = document.createElement('span');
                 myspan.innerHTML = legenditem.label;

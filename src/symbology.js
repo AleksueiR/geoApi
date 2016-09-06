@@ -495,14 +495,45 @@ function makeSVG(symbol) {
 
 }
 
-function makeSVG2(symbol) {
-    const draw = svgjs(window.document.createElement('div')).size(32, 32);
+/**
+* Generate a legend item for an ESRI symbol.
+* @private
+* @param  {Object} symbol an ESRI symbol object in server format
+* @param  {String} label label of the legend item
+* @param  {Object} window reference to the browser window
+* @return {Object} a legend object populated with the symbol and label
+*/
+function symbolToLegend(symbol, label, window) {
+    const containerSize = 32;
+    const contentSize = 24;
+    const containerCenter = containerSize / 2;
+    const contentPadding = (containerSize - contentSize) / 2 
+
+    const draw = svgjs(window.document.createElement('div')).size(containerSize, containerSize);
     
-    const typeHandler = {
+    /*const typeHandler = {
         esriSMS: makeMarkerSVG,
         esriSLS: drawLine,
         esriCLS: drawLine,
         esriSFS: drawPolyline
+    };*/
+
+    const esriSimpleMarkerSimbol = {
+        esriSMSPath: ({ size, path }) => 
+            draw.path(path).size(size)
+                .center(containerCenter, containerCenter),
+        
+        esriSMSCircle: ({ size }) => 
+            draw.circle(size)
+                .center(containerCenter, containerCenter),
+        
+        esriSMSCross: ({ size }) => 
+            draw.path('M 0,10 L 20,10 M 10,0 L 10,20').size(size)
+                .center(containerCenter, containerCenter),
+
+        esriSMSTriangle: ({ size }) =>
+            draw.path('M 20,20 L 10,0 0,20 Z').size(size)
+                .center(containerCenter, containerCenter)
     };
 
     const dashMap = {
@@ -520,125 +551,195 @@ function makeSVG2(symbol) {
         esriSLSNull: 'none'
     };
 
+    // 5x5 px patter with coloured diagonal lines
     const esriSFSFills = {
-        //esriSFSSolid: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/solid.png',
-        esriSFSSolid: null,
-        esriSFSNone: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/none.png',
-        esriSFSHorizontal: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/horizontal.png',
-        esriSFSVertical: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/vertical.png',
-        esriSFSForwardDiagonal: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/forwarddiagonal.png',
-        esriSFSBackwardDiagonal: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/backwarddiagonal.png',
-        esriSFSCross: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/cross.png',
-        esriSFSDiagonalCross: 'https://js.arcgis.com/3.17/esri/images/symbol/sfs/diagonalcross.png'
+        esriSFSSolid: colour => colour,
+        esriSFSNone: () => 'transparent',
+        esriSFSHorizontal: colour => {
+            const cellSize = 5;
+
+            // patter fill: horizonal line in a 5x5 px square 
+            return draw.pattern(cellSize, cellSize, add => {
+                add
+                    .line(0, cellSize / 2, cellSize, cellSize / 2)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'})
+            });
+        },
+        esriSFSVertical: colour => {
+            const cellSize = 5;
+
+            // patter fill: vertical line in a 5x5 px square
+            return draw.pattern(cellSize, cellSize, add => {
+                add
+                    .line(cellSize / 2, 0, cellSize / 2, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'})
+            });
+        },
+        esriSFSForwardDiagonal: colour => {
+            const cellSize = 5;
+
+            // patter fill: forward diagonal line in a 5x5 px square; two more diagonal lines offset to cover the corners when the main line is cut off
+            return draw.pattern(cellSize, cellSize, add => {
+                add
+                    .line(0, 0, cellSize, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'});
+                add
+                    .line(0, 0, cellSize, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'}).move(0, cellSize);
+                add
+                    .line(0, 0, cellSize, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'}).move(cellSize ,0);
+            });
+        },
+        esriSFSBackwardDiagonal: colour => {
+            const cellSize = 5;
+
+            // patter fill: backward diagonal line in a 5x5 px square; two more diagonal lines offset to cover the corners when the main line is cut off
+            return draw.pattern(cellSize, cellSize, add => {
+                add
+                    .line(cellSize, 0, 0, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'});
+                add
+                    .line(cellSize, 0, 0, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'}).move(cellSize / 2, cellSize / 2);
+                add
+                    .line(cellSize, 0, 0, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'}).move(-cellSize / 2,-cellSize / 2);
+            });
+        },
+        esriSFSCross: colour => {
+            const cellSize = 5;
+
+            // patter fill: horizonal and vertical lines in a 5x5 px square
+            return draw.pattern(cellSize, cellSize, add => {
+                add
+                    .line(cellSize / 2, 0, cellSize / 2, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'});
+                add
+                    .line(0, cellSize / 2, cellSize, cellSize / 2)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'});
+            });
+        },
+        esriSFSDiagonalCross: colour => {
+            const cellSize = 7;
+
+            // patter fill: crossing diagonal lines in a 7x7 px square
+            return draw.pattern(cellSize, cellSize, add => {
+                add
+                    .line(0, 0, cellSize, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'});
+                add
+                    .line(cellSize, 0, 0, cellSize)
+                    .stroke({color: colour, opacity: 1, width: 1, linecap: 'square'});
+            });
+        }        
     };
 
-    typeHandler[symbol.type](draw, symbol);
 
-    return draw.svg();
+    const symbolTypes = {
+        esriSMS() {
+            const size = Math.min(contentSize, symbol.size);
+            const symbolColour = parseEsriColour(symbol.color);
+            const outlineColour = parseEsriColour(symbol.outline.color);
+            
+            console.log('simplemarkersymbol --->', symbol)
 
-    function drawPolyline() {
-        console.log(' ---- polyline ');
+            // make an ESRI simple symbol and apply fill and outline to it
+            esriSimpleMarkerSimbol[symbol.style](symbol)
+                .fill({
+                    color: symbolColour.colour,
+                    opacity: symbolColour.opacity,
+                    rule: 'evenodd'
+                })
+                .stroke({
+                    color: outlineColour.colour,
+                    opacity: outlineColour.opacity,
+                    width: symbol.outline.width,
+                    // linecap: 'butt',
+                    // linejoin: 'miter',
+                    // miterlimit: 4, 
+                    dasharray: dashMap[symbol.outline.style] 
+                });
+        },
+        esriSLS() {
+            const lineColour = parseEsriColour(symbol.color);
 
-        const rectangle = draw.rect().move(4, 4).size(24, 24);
-        addFill(rectangle, symbol);
-        addStroke(rectangle, symbol.outline);
+            draw.line(contentPadding, contentPadding, containerSize - contentPadding, containerSize - contentPadding)
+                .stroke({
+                    color: lineColour.colour,
+                    opacity: lineColour.opacity,
+                    width: symbol.width,
+                    linecap: 'butt',
+                    linejoin: 'miter',
+                    miterlimit: 4, 
+                    dasharray: dashMap[symbol.style] 
+                });
+        },
+        esriCLS() {
+            this.esriSLS();
+        },
+        esriSFS() {
+            const fillColour = parseEsriColour(symbol.color);
+            const outlineColour = parseEsriColour(symbol.outline.color);
 
-        return;
-        /*
-        const polySVG = newSVG('rect');
+            draw.rect().move(contentPadding, contentPadding).size(contentSize, contentSize)
+                .fill({
+                    color: esriSFSFills[symbol.style](fillColour.colour),
+                    opacity: fillColour.opacity,
+                    rule: 'evenodd'
+                })
+                .stroke({
+                    color: outlineColour.colour,
+                    opacity: outlineColour.opacity,
+                    width: symbol.outline.width,
+                    linecap: 'butt',
+                    linejoin: 'miter',
+                    miterlimit: 4, 
+                    dasharray: dashMap[symbol.outline.style] 
+                });
+        },
 
-        polySVG.addProp('x', '4');
-        polySVG.addProp('y', '4');
-        polySVG.addProp('width', (maxW - 8).toString());
-        polySVG.addProp('height', (maxH - 8).toString());
-        applyFill(symbol, polySVG);
-        applyLine(symbol.outline, polySVG);
+        //esriPFS
 
-        return polySVG;*/
-    }
+        esriTS: () => {
+            throw new Error('no support for feature service legend of text symbols');
+        },
 
-    function drawLine() {
-        const line = draw.line(4, 4, 28, 28);
-        addStroke(line, symbol);
-    }
+        esriPMS: () => {
+            
+            console.log('esriPMS', data);
 
-    function addFill(polyline, symbol) {
-        //const fill = (symbol.type === 'esriSFS' && symbol.style !== 'esriSFSSolid') ? 'none' : colourToRgb(symbol.color);
-        
-        let fill = esriSFSFills[symbol.style] || colourToRgb(symbol.color);
+            const data = `data:${symbol.contentType};base64,${symbol.imageData}`;
+            const picturePromise = new Promise(resolve => {
+                const image = draw.image(data).loaded(loader => {
+                     //console.log('- image loaded', loader);
 
-        console.log(symbol, fill);
+                     // TODO: scale picture uniformly
 
-        fill = draw.pattern(5, 5, function(add) {
-            add.line(5, 0, 0, 5).stroke({color: colourToRgb(symbol.color), opacity: 1, width: 1, linecap: 'square'});
-            add.line(5, 0, 0, 5).stroke({color: colourToRgb(symbol.color), opacity: 1, width: 1, linecap: 'square'}).move(-2.5,-2.5);
-            add.line(5, 0, 0, 5).stroke({color: colourToRgb(symbol.color), opacity: 1, width: 1, linecap: 'square'}).move(2.5,2.5);
-        });
+                    if (loader.width > 28) {
+                        // console.log('resizing');
+                        image.size(28, 28);
+                    } else {
+                        // console.log('good enough');
+                        image.size(loader.width, loader.height);
+                    }
 
-        polyline.fill({
-            color: fill,
-            opacity: colourToOpacity2(symbol.color),
-            rule: 'evenodd'
-        });
+                    image.center(16, 16);
 
-        return;
+                    resolve();
+                });
+            });            
 
-        // NOTE: we cannot use ESRI simple fill with styles VERTICAL, HORIZONTAL, CROSS, DIAGONAL CROSS, FORWARD DIAGONAL, BACKWARD DIAGONAL
-        // ESRI implements these using image sprites containing the pattern, referenced in SVG using xlink tags.
-        // xlink is not supported in data URLs, which is what we are using.
-        // http://dbushell.com/2015/01/30/use-svg-part-2/
-
-        // possible awful fix: we draw our SVG to a canvas, then export the image as a data url there.
-
-        // second bad option: custom case, we have pre-made filled polygon (6 of them).  We would have to add the border (yuck)
-
-        // ok solution: add a second svg <path> with the hashes in it. just be lines. thin width, black, straight.  can adjust to size
-
-        // ------
-
-        // the none case will only apply to polygons. point symbols can only be empty fill via opacity
-        /*const fill = (symbol.type === 'esriSFS' && symbol.style !== 'esriSFSSolid') ? 'none' : colourToRgb(symbol.color);
-
-        svg.addProp('fill', fill);
-        svg.addProp('fill-opacity', colourToOpacity(symbol.color));
-        svg.addProp('fill-rule', 'evenodd');*/
-    }
-
-    function addStroke(line, symbol) {
-        // odd case where a symbol is missing an outline, so an undefined gets passed in
-        line.stroke({
-            color: colourToRgb(symbol.color),
-            opacity: colourToOpacity2(symbol.color), 
-            width: symbol.width,
-            linecap: 'butt', 
-            linejoin: 'miter', 
-            miterlimit: 4, 
-            dasharray: dashMap[symbol.style] 
-        });
-    }
-
-    function colourToOpacity2(c) {
-        if (c) {
-            return c[3] / 255;
-        } else {
-            return 0;
+            return picturePromise;
         }
-    }
-}
+    };
 
-/**
-* Generate a legend item for an ESRI symbol.
-* @private
-* @param  {Object} symbol an ESRI symbol object in server format
-* @param  {String} label label of the legend item
-* @param  {Object} window reference to the browser window
-* @return {Object} a legend object populated with the symbol and label
-*/
-function symbolToLegend(symbol, label, window) {
-    //console.log(svgjs);
-    
-    const draw = svgjs(window.document.createElement('dvi')).size(32, 32);
-    //console.log(draw);
+    console.log(symbol.type);
+
+    return Promise.resolve(symbolTypes[symbol.type]())
+        .then(() => {
+            return { label, svgcode: draw.svg() };
+        })
 
     const symbologyPromise = new Promise((resolve) => {
 
@@ -646,20 +747,91 @@ function symbolToLegend(symbol, label, window) {
         let contentType = 'image/svg+xml';
         let base = '';
 
+        let svgcode = null;
+
         try {
             switch (symbol.type) {
                 case 'esriSMS': // simplemarkersymbol
-                case 'esriSLS': // simplelinesymbol
-                case 'esriSFS': // simplefillsymbol
-                case 'esriCLS': // cartographiclinesymbol
-
-                    // IE11 will not render a plain SVG string. we need to encode it
-                    imageData = window.btoa(makeSVG(symbol));
-                    base = ';base64';
+                    const size = Math.min(contentSize, symbol.size);
+                    const symbolColour = parseEsriColour(symbol.color);
+                    const outlineColour = parseEsriColour(symbol.outline.color);
                     
-                    const svgcode = makeSVG2(symbol);
-                    console.log(svgcode);
+                    console.log('simplemarkersymbol --->', symbol)
 
+                    const marker = esriSimpleMarkerSimbol[symbol.style](symbol)
+                    
+                    
+                            
+                    marker.fill({
+                        color: symbolColour.colour,
+                        opacity: symbolColour.opacity,
+                        rule: 'evenodd'
+                    });
+                    // odd case where a symbol is missing an outline, so an undefined gets passed in
+                    marker.stroke({
+                        color: outlineColour.colour,
+                        opacity: outlineColour.opacity,
+                        width: symbol.outline.width,
+                        linecap: 'butt',
+                        linejoin: 'miter',
+                        miterlimit: 4, 
+                        dasharray: dashMap[symbol.outline.style] 
+                    });
+                    
+                    // addFill(marker, symbol);
+                    // addStroke(marker, symbol.outline);
+
+
+                    // get the appropriate drawing path for the symbol
+                    /*if (symbol.style === 'esriSMSPath') {
+                        path = symbol.path;
+                    } else {
+                        // jscs:disable maximumLineLength
+                        const c = getGlyphCorners(symbol.size);
+                        switch (symbol.style) {
+                            case 'esriSMSCross':
+                                path = `M ${c.upLeft},${c.middle} ${c.loRite},${c.middle} M ${c.middle},${c.loRite} ${c.middle},${c.upLeft}`;
+                                break;
+                            case 'esriSMSDiamond':
+                                path = `M ${c.upLeft},${c.middle} ${c.middle},${c.loRite} ${c.loRite},${c.middle} ${c.middle},${c.upLeft} Z`;
+                                break;
+                            case 'esriSMSSquare':
+                                path = `M ${c.upLeft},${c.upLeft} ${c.upLeft},${c.loRite} ${c.loRite},${c.loRite} ${c.loRite},${c.upLeft} Z`;
+                                break;
+                            case 'esriSMSX':
+                                path = `M ${c.upLeft},${c.upLeft} ${c.loRite},${c.loRite} M ${c.upLeft},${c.loRite} ${c.loRite},${c.upLeft}`;
+                                break;
+                            case 'esriSMSTriangle':
+                                path = `M ${c.upLeft},${c.loRite} ${c.middle},${c.upLeft} ${c.loRite},${c.loRite} Z`;
+                                break;
+                        }
+
+                        // jscs:enable maximumLineLength
+                    }*/
+
+                    svgcode = draw.svg();
+
+                    resolve({ label, svgcode, imageData, contentType, base });
+
+                    break;
+                case 'esriSLS': // simplelinesymbol
+                    drawLine();
+                
+                    svgcode = draw.svg();
+                    resolve({ label, svgcode, imageData, contentType, base });
+                    break;
+                    
+                case 'esriSFS': // simplefillsymbol
+                    drawPolyline();
+                    
+                    svgcode = draw.svg();
+                    resolve({ label, svgcode, imageData, contentType, base });
+                    break;
+
+                case 'esriCLS': // cartographiclinesymbol
+                    drawLine();
+
+                    svgcode = draw.svg();
                     resolve({ label, svgcode, imageData, contentType, base });
                     break;
 
@@ -715,47 +887,55 @@ function symbolToLegend(symbol, label, window) {
 
     return symbologyPromise;
 
-    /*
-    let imageData = emptySVG;
-    let contentType = 'image/svg+xml';
-    let base = '';
-
-    try {
-        switch (symbol.type) {
-            case 'esriSMS': // simplemarkersymbol
-            case 'esriSLS': // simplelinesymbol
-            case 'esriSFS': // simplefillsymbol
-            case 'esriCLS': // cartographiclinesymbol
-
-                // IE11 will not render a plain SVG string. we need to encode it
-                imageData = window.btoa(makeSVG(symbol));
-                base = ';base64';
-                break;
-
-            case 'esriPMS': // picturemarkersymbol
-            case 'esriPFS': // picturefillsymbol
-
-                // FIXME may be possible that there is no imageData, and it is a linked url that we can't support
-                // FIXME additional for picturefill, we would want to account for the border.
-                //       basically the same issue as the non-solid simplefillsymbol, in that
-                //       svg data urls cannot x-link to other images
-
-                imageData = symbol.imageData;
-                contentType = symbol.contentType;
-                base = ';base64';
-                break;
-
-            case 'esriTS': // textsymbol
-
-                // not supporting at the moment
-                // FIXME return a blank or default image (maybe a picture of 'Aa') to stop things from breaking
-                throw new Error('no support for feature service legend of text symbols');
-        }
-    } catch (e) {
-        console.error('Issue encountered when converting symbol to legend image', e);
-        label = 'Error!';
+    function drawPolyline() {
+        const rectangle = draw.rect().move(4, 4).size(24, 24);
+        addFill(rectangle, symbol);
+        addStroke(rectangle, symbol.outline);
     }
-    return { label, imageData, contentType, base };*/
+
+    function drawLine() {
+        const line = draw.line(4, 4, 28, 28);
+        addStroke(line, symbol);
+    }
+
+    function addFill(polyline, symbol) {
+        const { colour, opacity } = parseEsriColour(symbol.color);
+        
+        polyline.fill({
+            color: esriSFSFills[symbol.style](colour),
+            opacity: opacity,
+            rule: 'evenodd'
+        });
+    }
+
+    function addStroke(line, symbol) {
+        const { colour, opacity } = parseEsriColour(symbol.color);
+        
+        // odd case where a symbol is missing an outline, so an undefined gets passed in
+        line.stroke({
+            color: colour,
+            opacity,
+            width: symbol.width,
+            linecap: 'butt',
+            linejoin: 'miter',
+            miterlimit: 4, 
+            dasharray: dashMap[symbol.style] 
+        });
+    }
+
+    function parseEsriColour(c) {
+        if (c) {
+            return {
+                colour: `rgb(${c[0]},${c[1]},${c[2]})`,
+                opacity:  c[3] / 255
+            };
+        } else {
+            return {
+                colour: 'rgb(0, 0, 0)',
+                opacity: 0
+            };
+        }        
+    }
 }
 
 /**
