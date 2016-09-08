@@ -4,7 +4,6 @@
   "description": "",
   "main": "dist/geoapi.js",
   "dependencies": {
-    "svgjs": "^2.2.5"
   },
   "devDependencies": {
     "babelify": "~6.3.0",
