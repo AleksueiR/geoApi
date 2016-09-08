@@ -122,6 +122,18 @@
 
             });
 
+            layer2 = new api.layer.FeatureLayer('http://maps-cartes.ec.gc.ca/arcgis/rest/services/CESI/CESI_Air_Ozone/MapServer/2');
+
+            layer2.on('load', function(evt) {
+                var legend2 = api.symbology.rendererToLegend(layer2.renderer.toJson() , 0);
+                // console.log('legend2', legend2);
+
+                legend2.layers[0].legend.forEach(legItem => {
+                    addImg('bucket2', legItem);
+                })
+
+            });
+
             // simple fill
             var layer3 = new api.layer.FeatureLayer('http://ec.gc.ca/arcgis/rest/services/JOSM/Oilsands/MapServer/2');
 
